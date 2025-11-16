@@ -1,4 +1,4 @@
-from torch import nn, as_tensor, cat
+from torch import nn, as_tensor, save, load
 from torch.distributions.categorical import Categorical
 from torch.optim import Adam
 import numpy as np
@@ -14,10 +14,15 @@ def build_model(observation_size, action_size):
 
 class VPG:
   def __init__(self, observation_size, action_size, learning_rate = 0.001):
+    self.learning_rate = learning_rate
     self.observation_size = observation_size
     self.action_size = action_size
     self.policy_model = build_model(observation_size, action_size)
-    self.optimiser = Adam(self.policy_model.parameters(), lr = learning_rate)
+    self.optimiser = Adam(self.policy_model.parameters(), lr = self.learning_rate)
+
+  def set_learning_rate(self, learning_rate):
+    self.learning_rate = learning_rate 
+    self.optimiser = Adam(self.policy_model.parameters(), lr = self.learning_rate)
 
   def policy(self, observation):
     logits = self.policy_model(observation)
@@ -38,14 +43,17 @@ class VPG:
     for _ in range(num_episodes):
       ep_transitions.append(self.train_episode(env))
 
+    ep_rewards = [transition_batch[0][2] for transition_batch in ep_transitions]
+
     transitions = [transition for transition_batch in ep_transitions for transition in transition_batch]
 
     self.optimiser.zero_grad()
     loss = self.compute_loss(transitions)
-    print(loss)
 
     loss.backward()
     self.optimiser.step()
+
+    return ep_rewards
 
   
   def train_episode(self, env):
@@ -66,4 +74,10 @@ class VPG:
 
 
     return [(state, action, ep_reward) for state, action in transitions]
+  
+  def save(self, filepath):
+    save(self.policy_model.state_dict(), filepath)
 
+  def load(self, filepath):
+    self.policy_model.load_state_dict(load(filepath, weights_only=True))
+    self.optimiser = Adam(self.policy_model.parameters(), lr = self.learning_rate)
