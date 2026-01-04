@@ -13,12 +13,13 @@ def build_model(observation_size, action_size):
   )
 
 class VPG:
-  def __init__(self, observation_size, action_size, learning_rate = 0.001):
+  def __init__(self, observation_size, action_size, learning_rate = 0.001, distribution = Categorical):
     self.learning_rate = learning_rate
     self.observation_size = observation_size
     self.action_size = action_size
     self.policy_model = build_model(observation_size, action_size)
     self.optimiser = Adam(self.policy_model.parameters(), lr = self.learning_rate)
+    self.distribution = distribution
 
   def set_learning_rate(self, learning_rate):
     self.learning_rate = learning_rate 
@@ -26,13 +27,13 @@ class VPG:
 
   def policy(self, observation):
     logits = self.policy_model(observation)
-    return Categorical(logits = logits)
+    return self.distribution(logits = logits)
   
   def compute_loss(self, transitions):
     state, actions, rewards = tuple(zip(*transitions))
     state, actions, rewards = as_tensor(np.array(state)), as_tensor(actions), as_tensor(rewards)
 
-    log_probs = self.policy(state).log_prob(actions)
+    log_probs = self.policy(state).log_prob(actions).sum(axis=-1)
 
     return - (log_probs * rewards).mean()
 
